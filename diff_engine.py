@@ -1,17 +1,13 @@
 import difflib
-import re
 
 def metinleri_karsilastir(orijinal_metin, yeni_metin):
-    # DÜZELTME 1: Sadece boşluklardan bölmek yerine, noktalama işaretlerini de kelimelerden ayırıyoruz.
-    # Örnek: "Değerlendirilmesi:" -> ["Değerlendirilmesi", ":"]
-    # \w+ (harf/rakam grupları) veya [^\s\w]+ (boşluk olmayan noktalama işaretleri)
-    orijinal_kelimeler = re.findall(r'\w+|[^\s\w]+', orijinal_metin)
-    yeni_kelimeler = re.findall(r'\w+|[^\s\w]+', yeni_metin)
+    # En saf hali: Hiçbir dış müdahale, regex veya filtre yok.
+    # Metni ham haliyle, sadece boşluklardan kelimelere bölüyoruz.
+    orijinal_kelimeler = orijinal_metin.split()
+    yeni_kelimeler = yeni_metin.split()
 
-    # DÜZELTME 2: autojunk=False parametresi! 
-    # Sık tekrar eden kelimelerin eşleşmeyi bozmasını (hiza kaymasını) engeller.
-    matcher = difflib.SequenceMatcher(None, orijinal_kelimeler, yeni_kelimeler, autojunk=False)
-    
+    # SequenceMatcher tamamen kendi doğal varsayılan ayarlarıyla çalışıyor
+    matcher = difflib.SequenceMatcher(None, orijinal_kelimeler, yeni_kelimeler)
     fark_verisi = []
     
     for islem, i1, i2, j1, j2 in matcher.get_opcodes():
@@ -25,18 +21,13 @@ def metinleri_karsilastir(orijinal_metin, yeni_metin):
             fark_verisi.append(('silindi', ' '.join(orijinal_kelimeler[i1:i2])))
             
         elif islem == 'replace':
-            fark_verisi.append(('degisti_eski', ' '.join(orijinal_kelimeler[i1:i2])))
-            fark_verisi.append(('degisti_yeni', ' '.join(yeni_kelimeler[j1:j2])))
+            eski_blok = ' '.join(orijinal_kelimeler[i1:i2])
+            yeni_blok = ' '.join(yeni_kelimeler[j1:j2])
+            
+            fark_verisi.append(('degisti_eski', eski_blok))
+            fark_verisi.append(('degisti_yeni', yeni_blok))
 
-    # Ekran görünümünü temizlemek için Regex ile ayrılmış noktalama işaretlerinin 
-    # önündeki gereksiz boşlukları toparlayan ufak bir temizlik (örn: "kelime ," -> "kelime,")
-    temizlenmis_fark = []
-    for islem, metin in fark_verisi:
-        toparlanmis_metin = re.sub(r'\s+([.,:;!?%)\]])', r'\1', metin) # Noktalamadan önceki boşluğu sil
-        toparlanmis_metin = re.sub(r'([(>\[])\s+', r'\1', toparlanmis_metin) # Parantezden sonraki boşluğu sil
-        temizlenmis_fark.append((islem, toparlanmis_metin))
-
-    return temizlenmis_fark
+    return fark_verisi
 
 # --- TEST KODU ---
 if __name__ == "__main__":
