@@ -1,6 +1,8 @@
 # Sanal ortam dosyaları
 venv/
 
+test/
+
 # Python önbellek dosyaları
 __pycache__/
 *.pyc
