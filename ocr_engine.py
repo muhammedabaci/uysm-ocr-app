@@ -86,4 +86,4 @@ def hibrit_ve_sirali_pdf_oku(pdf_yolu):
     return tam_metin
 
 # Testi çalıştır:
-hibrit_ve_sirali_pdf_oku("deneme_hibrit.pdf")
+#hibrit_ve_sirali_pdf_oku("deneme_hibrit.pdf")
