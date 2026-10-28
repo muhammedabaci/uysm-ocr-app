@@ -8,6 +8,10 @@ import re
 pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
 
 def cop_metin_mi(metin):
+    # Eğer metin 40 karakterden uzunsa, bu kesinlikle mühür/imza lekesi değildir, gerçek bir cümledir.
+    if len(metin) > 40:
+        return False
+    
     harf_sayisi = len(re.findall(r'[a-zA-ZğüşöçıİĞÜŞÖÇ]', metin))
     ozel_karakter_sayisi = len(re.findall(r'[^a-zA-ZğüşöçıİĞÜŞÖÇ0-9\s]', metin))
     
@@ -52,7 +56,10 @@ def hibrit_ve_sirali_pdf_oku(pdf_yolu):
             
         # 3. ADIM: Geriye kalan (Flat) kısımları OCR'a sok (Koordinatlarıyla Birlikte!)
         # Output.DICT bize sadece metni değil, kelimelerin sayfadaki konumlarını (top, left) da verir.
-        ocr_veri = pytesseract.image_to_data(img, lang='tur', output_type=Output.DICT)
+        
+        # --psm 11: "Sparse Text" (Seyrek Metin) modudur. 
+        # Sayfa düzenini umursama, nerede bir kelime adacığı görürsen zorla oku emridir.
+        ocr_veri = pytesseract.image_to_data(img, lang='tur', config='--psm 11', output_type=Output.DICT)
         
         # Tesseract kelimeleri dağınık verebilir, onları satır satır toparlayalım:
         satirlar = {}
