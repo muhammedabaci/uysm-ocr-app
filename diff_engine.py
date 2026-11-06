@@ -1,41 +1,59 @@
 import difflib
 
-def metinleri_karsilastir(orijinal_metin, yeni_metin):
-    # En saf hali: Hiçbir dış müdahale, regex veya filtre yok.
-    # Metni ham haliyle, sadece boşluklardan kelimelere bölüyoruz.
-    orijinal_kelimeler = orijinal_metin.split()
-    yeni_kelimeler = yeni_metin.split()
+def metinleri_karsilastir(orijinal_objeler, yeni_objeler):
+    # Artık düz metin (string) değil, OCR'dan gelen koordinatlı kelime objelerini alıyoruz.
+    
+    # difflib'in matematiksel kıyaslama yapabilmesi için bu objelerin içinden
+    # sadece 'text' (metin) kısımlarını çıkararak iki basit liste oluşturuyoruz.
+    orijinal_metinler = [obje['text'] for obje in orijinal_objeler]
+    yeni_metinler = [obje['text'] for obje in yeni_objeler]
 
-    # SequenceMatcher tamamen kendi doğal varsayılan ayarlarıyla çalışıyor
-    matcher = difflib.SequenceMatcher(None, orijinal_kelimeler, yeni_kelimeler)
+    # SequenceMatcher, saf metin listelerini kendi doğal ayarlarıyla kıyaslıyor
+    matcher = difflib.SequenceMatcher(None, orijinal_metinler, yeni_metinler)
     fark_verisi = []
     
     for islem, i1, i2, j1, j2 in matcher.get_opcodes():
         if islem == 'equal':
-            fark_verisi.append(('esit', ' '.join(orijinal_kelimeler[i1:i2])))
+            # Eşit olan kelimelerin orijinal objelerini (koordinatlarıyla) listeye ekliyoruz
+            fark_verisi.append(('esit', orijinal_objeler[i1:i2]))
             
         elif islem == 'insert':
-            fark_verisi.append(('eklendi', ' '.join(yeni_kelimeler[j1:j2])))
+            # Yeni eklenen kelimelerin yeni objelerini alıyoruz (Orijinalde olmadıkları için)
+            fark_verisi.append(('eklendi', yeni_objeler[j1:j2]))
             
         elif islem == 'delete':
-            fark_verisi.append(('silindi', ' '.join(orijinal_kelimeler[i1:i2])))
+            # Silinen kelimelerin orijinal objelerini alıyoruz (Sadece eski PDF'te varlar)
+            fark_verisi.append(('silindi', orijinal_objeler[i1:i2]))
             
         elif islem == 'replace':
-            eski_blok = ' '.join(orijinal_kelimeler[i1:i2])
-            yeni_blok = ' '.join(yeni_kelimeler[j1:j2])
-            
-            fark_verisi.append(('degisti_eski', eski_blok))
-            fark_verisi.append(('degisti_yeni', yeni_blok))
+            # Değişen kelimelerin hem eski hem yeni objelerini alıyoruz.
+            # Böylece arayüzde eski PDF'te kırmızı, yeni PDF'te yeşil boyayabileceğiz.
+            fark_verisi.append(('degisti_eski', orijinal_objeler[i1:i2]))
+            fark_verisi.append(('degisti_yeni', yeni_objeler[j1:j2]))
 
     return fark_verisi
 
 # --- TEST KODU ---
 if __name__ == "__main__":
-    eski = "Davacı taraf sözleşmeden feragat ettiğini 15 Mayıs tarihinde bildirmiştir."
-    yeni = "Davacı taraf sözleşmeden kesinlikle feragat ettiğini 16 Mayıs tarihinde yazılı olarak bildirmiştir."
+    # Test için sahte (mock) koordinatlı kelime objeleri oluşturalım
+    eski_liste = [
+        {'text': 'Davacı', 'bbox': (10, 10, 50, 20), 'page': 0},
+        {'text': 'feragat', 'bbox': (60, 10, 100, 20), 'page': 0},
+        {'text': 'etti.', 'bbox': (110, 10, 130, 20), 'page': 0}
+    ]
     
-    sonuclar = metinleri_karsilastir(eski, yeni)
+    yeni_liste = [
+        {'text': 'Davacı', 'bbox': (10, 10, 50, 20), 'page': 0},
+        {'text': 'kesinlikle', 'bbox': (55, 10, 95, 20), 'page': 0},
+        {'text': 'feragat', 'bbox': (100, 10, 140, 20), 'page': 0},
+        {'text': 'ettiğini', 'bbox': (150, 10, 180, 20), 'page': 0},
+        {'text': 'bildirdi.', 'bbox': (190, 10, 230, 20), 'page': 0}
+    ]
     
-    print("\n--- KARŞILAŞTIRMA SONUCU ---")
-    for islem_tipi, kelime_grubu in sonuclar:
-        print(f"[{islem_tipi.upper()}] -> {kelime_grubu}")
+    sonuclar = metinleri_karsilastir(eski_liste, yeni_liste)
+    
+    print("\n--- OBJE TABANLI KARŞILAŞTIRMA SONUCU ---")
+    for islem_tipi, obje_grubu in sonuclar:
+        # Obje içindeki text'leri yan yana yazdırıp sonucu görelim
+        kelimeler = " ".join([obj['text'] for obj in obje_grubu])
+        print(f"[{islem_tipi.upper()}] -> {kelimeler} (Obje Sayısı: {len(obje_grubu)})")
