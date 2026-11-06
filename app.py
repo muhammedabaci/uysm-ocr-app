@@ -5,7 +5,7 @@ from PIL import Image
 from ocr_engine import hibrit_ve_sirali_pdf_oku
 from diff_engine import metinleri_karsilastir
 
-# Sayfayı geniş modda başlat (Yan yana iki belge göstereceğimiz için alan lazım)
+# Sayfayı geniş modda başlat
 st.set_page_config(layout="wide", page_title="Hukuki Doküman OCR ve Kıyaslama")
 
 st.title("Hukuki Doküman OCR ve Karşılaştırma Sistemi")
@@ -18,62 +18,49 @@ with col1:
 with col2:
     yeni_pdf_file = st.file_uploader("Yeni (Değiştirilmiş) Belge", type=["pdf"])
 
-# Boyama Fonksiyonu (PyMuPDF ile fosforlu çizim)
+# Boyama Fonksiyonu (Şeffaflık Eklendi)
 def boyama_yap(doc, kelimeler, renk):
-    # renk formatı: RGB (0-1 arası). Örn: Kırmızı (1, 0, 0)
     for kelime in kelimeler:
         page_no = kelime['page']
         bbox = kelime['bbox']
         
         sayfa = doc[page_no]
-        rect = pymupdf.Rect(bbox) # Koordinatları PyMuPDF dikdörtgenine çevir
+        rect = pymupdf.Rect(bbox) 
         
         annot = sayfa.add_highlight_annot(rect)
         annot.set_colors(stroke=renk)
+        annot.set_opacity(0.4) # Yarı şeffaflık: Altındaki siyah metnin cam gibi okunmasını sağlar
         annot.update()
 
 if orijinal_pdf_file and yeni_pdf_file:
     if st.button("Belgeleri Analiz Et ve Karşılaştır", use_container_width=True):
         with st.spinner("Motorlar çalışıyor, koordinatlar eşleştiriliyor..."):
             
-            # Dosyaları bellekte oku ve OCR motoruna gönder
             orj_bytes = orijinal_pdf_file.read()
             yeni_bytes = yeni_pdf_file.read()
             
             orj_kelimeler, orj_ham_metin = hibrit_ve_sirali_pdf_oku(orj_bytes)
             yeni_kelimeler, yeni_ham_metin = hibrit_ve_sirali_pdf_oku(yeni_bytes)
             
-            # Diff motoruna koordinatlı objeleri gönder
             fark_sonuclari = metinleri_karsilastir(orj_kelimeler, yeni_kelimeler)
             
-            # PDF'leri PyMuPDF ile tekrar aç (Üzerinde boyama yapmak için)
             orj_doc = pymupdf.open(stream=orj_bytes, filetype="pdf")
             yeni_doc = pymupdf.open(stream=yeni_bytes, filetype="pdf")
             
-            # Fark sonuçlarını gez ve ilgili belgelere renk atamalarını yap
+            # GÜNCEL UX MANTIĞI: Turuncu iptal edildi, sadece Pastel Kırmızı ve Pastel Yeşil var.
             for islem, obje_grubu in fark_sonuclari:
-                if islem == 'silindi':
-                    # Sadece orijinal belgede vardı, kırmızıya boya
-                    boyama_yap(orj_doc, obje_grubu, (1, 0, 0)) # Kırmızı
+                
+                # Orijinal (Eski) belgede silinen veya değişen eski her şeyi Kırmızı yap
+                if islem in ['silindi', 'degisti_eski']:
+                    boyama_yap(orj_doc, obje_grubu, (1, 0.4, 0.4)) # Pastel Kırmızı
                     
-                elif islem == 'eklendi':
-                    # Sadece yeni belgede var, yeşile boya
-                    boyama_yap(yeni_doc, obje_grubu, (0, 1, 0)) # Yeşil
-                    
-                elif islem == 'degisti_eski':
-                    # Orijinal belgedeki değişen eski kelimeyi sarıya boya
-                    boyama_yap(orj_doc, obje_grubu, (1, 0.8, 0)) # Sarı
-                    
-                elif islem == 'degisti_yeni':
-                    # Yeni belgedeki değişmiş yeni kelimeyi sarıya boya
-                    boyama_yap(yeni_doc, obje_grubu, (1, 0.8, 0)) # Sarı
+                # Yeni belgede eklenen veya değişerek gelen yeni her şeyi Yeşil yap
+                elif islem in ['eklendi', 'degisti_yeni']:
+                    boyama_yap(yeni_doc, obje_grubu, (0.4, 1, 0.4)) # Pastel Yeşil
 
             st.success("Analiz tamamlandı! Değişiklikler aşağıda işaretlenmiştir.")
             
-            # Renklendirilmiş sayfaları yan yana gösterme alanı
             gorsel_col1, gorsel_col2 = st.columns(2)
-            
-            # Sayfaları yüksek çözünürlüklü (zoom 2.0) resimlere çevirip ekrana bas
             zoom = pymupdf.Matrix(2.0, 2.0)
             
             with gorsel_col1:
